@@ -28,6 +28,9 @@ class Ui_Login(QtWidgets.QDialog):
     def loginOnClicked(self):
         username = self.username.text()
         password = self.password.text()
+        self.username.clear()
+        self.password.clear()
+        self.username.setFocus()
 
         if username == '':
             notification.showNotif('Username tidak boleh kosong')
