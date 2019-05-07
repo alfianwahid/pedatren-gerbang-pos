@@ -20,7 +20,7 @@ class Pedatren:
         'User-Agent' : CONFIG.get('User-Agent')
     }
     __token = ''
-    credentials = ''
+    credentials = None
     __filetoken = 'token.tmp'
 
     def __init__(self):
