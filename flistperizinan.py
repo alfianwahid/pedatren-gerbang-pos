@@ -167,22 +167,23 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
         self.tablePerizinan.horizontalHeader().setSectionResizeMode(9, QtWidgets.QHeaderView.Stretch)
         self.tablePerizinan.horizontalHeader().setSectionResizeMode(10, QtWidgets.QHeaderView.ResizeToContents)
 
-        responseUserProfile = Pedatren.getUserProfile()
-        if responseUserProfile.status_code >= 200 or responseUserProfile.status_code < 300:
-            self.__userProfile = json.loads(responseUserProfile.text)
+        if (not Pedatren.credentials) is False:
+            responseUserProfile = Pedatren.getUserProfile()
+            if responseUserProfile.status_code >= 200 or responseUserProfile.status_code < 300:
+                self.__userProfile = json.loads(responseUserProfile.text)
 
-        if self.__userProfile:
-            self.label_credential_nama_lengkap.setText(Pedatren.credentials['nama_lengkap'] if Pedatren.credentials else '-')
-            self.label_credential_nama_lengkap.adjustSize()
+            if self.__userProfile:
+                self.label_credential_nama_lengkap.setText(Pedatren.credentials['nama_lengkap'] if Pedatren.credentials else '-')
+                self.label_credential_nama_lengkap.adjustSize()
 
 
-            userProfileFoto = Pedatren.getImage(self.__userProfile['fotodiri']['small'])
-            qimg = QtGui.QImage.fromData(userProfileFoto.content)
-            pixmap = QtGui.QPixmap.fromImage(qimg)
-            self.label_fotodiri.setPixmap(pixmap.scaled(50, 50, QtCore.Qt.KeepAspectRatio))
+                userProfileFoto = Pedatren.getImage(self.__userProfile['fotodiri']['small'])
+                qimg = QtGui.QImage.fromData(userProfileFoto.content)
+                pixmap = QtGui.QPixmap.fromImage(qimg)
+                self.label_fotodiri.setPixmap(pixmap.scaled(50, 50, QtCore.Qt.KeepAspectRatio))
 
-            self.label_credential_nik.setText(self.__userProfile['nik'])
-            self.label_credential_nik.adjustSize()
+                self.label_credential_nik.setText(self.__userProfile['nik'])
+                self.label_credential_nik.adjustSize()
 
         self.statusBar().showMessage(' Data terakhir diperbaharui: ' + str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) )
 
