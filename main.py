@@ -7,13 +7,13 @@ class Controller:
     def __init__(self):
         self.login = flogin.Ui_Login()
         self.mainWindow = flistperizinan.Ui_TablePerizinan()
+        self.login.switch_window.connect(self.showMainWindow)
+        self.mainWindow.switch_window.connect(self.showLogin)
 
     def showLogin(self):
-        self.login.switch_window.connect(self.showMainWindow)
         self.login.show()
 
     def showMainWindow(self):
-        self.mainWindow.switch_window.connect(self.showLogin)
         if self.mainWindow.buildTable():
             self.mainWindow.show()
 
