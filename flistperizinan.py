@@ -60,6 +60,7 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
     def showUserProfile(self):
         if not self.__userProfile:
             notification.showNotif('Kegagalan system mendapatkan info user Anda. Silahkan coba login ulang lagi.')
+            return
 
         self.__userProfileDialog = fprofileuser.Ui_ProfileUser()
         self.__userProfileDialog.tabWidget.setCurrentIndex(0)
