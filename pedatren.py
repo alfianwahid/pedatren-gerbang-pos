@@ -29,7 +29,7 @@ class Pedatren:
         except IOError:
             open(self.__filetoken, 'w')
 
-        with open('token.tmp', 'r') as f:
+        with open(self.__filetoken, 'r') as f:
             token = f.read()
             if token:
                 self.__token = token
@@ -63,7 +63,7 @@ class Pedatren:
             jwtPayload += "=" * ((4 - len(jwtPayload) % 4) % 4)
             self.credentials = json.loads(base64.b64decode(jwtPayload))
 
-            with open('token.tmp', 'w') as f:
+            with open(self.__filetoken, 'w') as f:
                 f.write(self.__token)
 
         else:
@@ -75,7 +75,7 @@ class Pedatren:
     def logout(self):
         response = requests.get(self.__baseUrl + '/auth/logout', headers=self.__headers)
 
-        with open('token.tmp', 'w') as f:
+        with open(self.__filetoken, 'w') as f:
             f.write('')
 
         return response
