@@ -41,6 +41,7 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
         self.menu_AutoConfirm.setChecked(False)
         self.menu_ManualConfirm.triggered.connect(self.toggleMenuManualConfirm)
         self.menu_AutoConfirm.triggered.connect(self.toggleMenuAutoConfirm)
+        self.menu_About.triggered.connect(self.menuAbout)
         # self.input_cari.setValidator(QtGui.QRegExpValidator(QtCore.QRegExp('\d+'), self))
         self.menu_ProfileUser.triggered.connect(self.showUserProfile)
         self.menu_Keluar.triggered.connect(self.logoutOnClicked)
@@ -48,6 +49,9 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
 
 
         self.buildTable()
+
+    def menuAbout(self):
+        QtWidgets.QMessageBox.about(self, 'About', 'Aplikasi Pedatren Gerbang Pos. \n\n\nVersi : 1.0.0 \nRelease : Mei 2019 \nDeveloped by : @alfianwahid')
 
     def toggleMenuManualConfirm(self):
         self.menu_ManualConfirm.setChecked(True)
