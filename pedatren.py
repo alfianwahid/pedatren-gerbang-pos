@@ -1,4 +1,5 @@
-import requests, json, base64
+import sys, os, requests, json, base64
+from tempfile import gettempdir
 from config import CONFIG
 
 
@@ -11,7 +12,7 @@ class Pedatren:
         'connection' : 'keep-alive',
         'User-Agent' : CONFIG.get('User-Agent')
     }
-    __filetoken = 'token.tmp'
+    __filetoken = 'tokenpedatrengerbangpos.tmp'
     credentials = None
 
     def __new__(cls, *args, **kwargs):
@@ -23,6 +24,13 @@ class Pedatren:
         self.Request = requests.Session()
         self.Request.headers.update(self.__headers)
         self.__baseUrl = CONFIG.get('BASE_API_URL')
+
+        if getattr(sys, 'frozen', False):
+            application_path = gettempdir()
+        elif __file__:
+            application_path = os.path.dirname(os.path.abspath(__file__))
+
+        self.__filetoken = os.path.join(application_path, self.__filetoken)
 
         try:
             open(self.__filetoken, 'r')
