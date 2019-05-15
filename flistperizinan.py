@@ -7,6 +7,7 @@ from datetime import datetime
 Pedatren = pedatren.Pedatren()
 
 class Ui_TablePerizinan(QtWidgets.QMainWindow):
+    __lastWindowState = None
     __childDialog = None
     __itemIzin = None
     __userProfile = None
@@ -22,6 +23,7 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
         uic.loadUi(os.path.join(self.__basePath, 'ui_listperizinan.ui'), self)
         self.setWindowIcon( QtGui.QIcon( os.path.join(self.__basePath, 'img/logo.png') ) )
         self.setWindowState(QtCore.Qt.WindowMaximized)
+        self.__lastWindowState = self.windowState()
         self.label_fotodiri.clear()
 
         self.buttonLogout.setIcon(QtGui.QIcon(os.path.join(self.__basePath, 'img/logout.ico')))
@@ -466,5 +468,13 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
             self.switch_window.emit()
         else:
             pass
+
+    def keyPressEvent(self, e):
+        if e.key() == QtCore.Qt.Key_F11:
+            if self.isFullScreen() == False:
+                self.__lastWindowState = self.windowState()
+                self.showFullScreen()
+            else:
+                self.setWindowState(self.__lastWindowState)
 
 
