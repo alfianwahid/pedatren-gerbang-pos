@@ -14,8 +14,7 @@ class Controller:
         self.login.show()
 
     def showMainWindow(self):
-        if self.mainWindow.buildTable():
-            self.mainWindow.show()
+        self.mainWindow.show()
 
 def main():
     app = QtWidgets.QApplication(sys.argv)

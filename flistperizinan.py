@@ -50,7 +50,28 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
         self.__iconReadingQrPath = os.path.join(self.__basePath, 'img/qr-reading-focus.jpg').replace('\\', '/')
 
 
-        self.buildTable()
+
+    def __responseApiHandler(self, response, autoCloseNotif=False):
+        if response is None:
+            notification.showNotif('Ops, error tidak diketahui, response API is None')
+            self.close()
+            sys.exit(1)
+            return False
+
+        elif 'exception' in response:
+            notification.showNotif(response['exception'], autoCloseNotif)
+            return False
+
+        elif response.status_code == 401:
+            self.close()
+            self.switch_window.emit()
+            return False
+        elif response.status_code < 200 or response.status_code >= 300:
+            errMsg = response.json()
+            notification.showNotif(errMsg['message'], autoCloseNotif)
+            return False
+
+        return True
 
     def menuAbout(self):
         QtWidgets.QMessageBox.about(self, 'About', 'Aplikasi Pedatren Gerbang Pos. \n\n\nVersi : 1.0.0 \nRelease : Mei 2019 \nDeveloped by : @alfianwahid')
@@ -63,6 +84,25 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
         self.menu_ManualConfirm.setChecked(False)
         self.menu_AutoConfirm.setChecked(True)
 
+    def __getProfileUser(self):
+        if (not Pedatren.credentials) is False:
+            responseUserProfile = Pedatren.getUserProfile()
+            if responseUserProfile.status_code >= 200 and responseUserProfile.status_code < 300:
+                self.__userProfile = json.loads(responseUserProfile.text)
+                levelScope = Pedatren.credentials['scope'][len(Pedatren.credentials['scope'])-1]
+                self.label_credential_nama_lengkap.setText( Pedatren.credentials['nama_lengkap'] + ' (' + levelScope +')' )
+                self.label_credential_nama_lengkap.adjustSize()
+
+
+                userProfileFoto = Pedatren.getImage(self.__userProfile['fotodiri']['small'])
+                if userProfileFoto.status_code >= 200 and userProfileFoto.status_code < 300:
+                    qimg = QtGui.QImage.fromData(userProfileFoto.content)
+                    pixmap = QtGui.QPixmap.fromImage(qimg)
+                    self.label_fotodiri.setPixmap(pixmap.scaled(50, 50, QtCore.Qt.KeepAspectRatio))
+
+                    self.label_credential_nik.setText(self.__userProfile['nik'])
+                    self.label_credential_nik.adjustSize()
+
     def showUserProfile(self):
         if not self.__userProfile:
             notification.showNotif('Kegagalan system mendapatkan info user Anda. Silahkan coba login ulang lagi.')
@@ -73,9 +113,10 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
 
         # Biodata
         fotodiri = Pedatren.getImage(self.__userProfile['fotodiri']['medium'])
-        qimg = QtGui.QImage.fromData(fotodiri.content)
-        pixmap = QtGui.QPixmap.fromImage(qimg)
-        self.__userProfileDialog.label_fotodiri.setPixmap(pixmap.scaled(190, 190, QtCore.Qt.KeepAspectRatio))
+        if fotodiri.status_code >= 200 and fotodiri.status_code < 300:
+            qimg = QtGui.QImage.fromData(fotodiri.content)
+            pixmap = QtGui.QPixmap.fromImage(qimg)
+            self.__userProfileDialog.label_fotodiri.setPixmap(pixmap.scaled(190, 190, QtCore.Qt.KeepAspectRatio))
 
         self.__userProfileDialog.label_nokk.setText(self.__userProfile['nokk'])
         self.__userProfileDialog.label_nik.setText(self.__userProfile['nik'])
@@ -150,54 +191,27 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
         self.__userProfileDialog.exec_()
 
     def buildTable(self, cari=None):
-
         response = Pedatren.getListPerizinan(cari)
-        if response.status_code < 200 or response.status_code >= 300:
-            self.close()
-            self.switch_window.emit()
-            return False
+        if self.__responseApiHandler(response):
+            listPerizinan = json.loads(response.text)
+            self.__buildHeaderTable()
+            self.__buildRowTable(listPerizinan)
 
+            self.tablePerizinan.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
+            self.tablePerizinan.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
+            self.tablePerizinan.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch)
+            self.tablePerizinan.horizontalHeader().setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)
+            self.tablePerizinan.horizontalHeader().setSectionResizeMode(4, QtWidgets.QHeaderView.Stretch)
+            self.tablePerizinan.horizontalHeader().setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeToContents)
+            self.tablePerizinan.horizontalHeader().setSectionResizeMode(6, QtWidgets.QHeaderView.Stretch)
+            self.tablePerizinan.horizontalHeader().setSectionResizeMode(7, QtWidgets.QHeaderView.ResizeToContents)
+            self.tablePerizinan.horizontalHeader().setSectionResizeMode(8, QtWidgets.QHeaderView.ResizeToContents)
+            self.tablePerizinan.horizontalHeader().setSectionResizeMode(9, QtWidgets.QHeaderView.Stretch)
+            self.tablePerizinan.horizontalHeader().setSectionResizeMode(10, QtWidgets.QHeaderView.ResizeToContents)
 
-        listPerizinan = json.loads(response.text)
-        self.buildHeaderTable()
-        self.buildRowTable(listPerizinan)
+            self.statusBar().showMessage(' Data terakhir diperbaharui: ' + str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) )
 
-        self.tablePerizinan.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
-        self.tablePerizinan.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)
-        self.tablePerizinan.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch)
-        self.tablePerizinan.horizontalHeader().setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)
-        self.tablePerizinan.horizontalHeader().setSectionResizeMode(4, QtWidgets.QHeaderView.Stretch)
-        self.tablePerizinan.horizontalHeader().setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeToContents)
-        self.tablePerizinan.horizontalHeader().setSectionResizeMode(6, QtWidgets.QHeaderView.Stretch)
-        self.tablePerizinan.horizontalHeader().setSectionResizeMode(7, QtWidgets.QHeaderView.ResizeToContents)
-        self.tablePerizinan.horizontalHeader().setSectionResizeMode(8, QtWidgets.QHeaderView.ResizeToContents)
-        self.tablePerizinan.horizontalHeader().setSectionResizeMode(9, QtWidgets.QHeaderView.Stretch)
-        self.tablePerizinan.horizontalHeader().setSectionResizeMode(10, QtWidgets.QHeaderView.ResizeToContents)
-
-        if (not Pedatren.credentials) is False:
-            responseUserProfile = Pedatren.getUserProfile()
-            if responseUserProfile.status_code >= 200 or responseUserProfile.status_code < 300:
-                self.__userProfile = json.loads(responseUserProfile.text)
-
-            if self.__userProfile:
-                levelScope = Pedatren.credentials['scope'][len(Pedatren.credentials['scope'])-1]
-                self.label_credential_nama_lengkap.setText( Pedatren.credentials['nama_lengkap'] + ' (' + levelScope +')' )
-                self.label_credential_nama_lengkap.adjustSize()
-
-
-                userProfileFoto = Pedatren.getImage(self.__userProfile['fotodiri']['small'])
-                qimg = QtGui.QImage.fromData(userProfileFoto.content)
-                pixmap = QtGui.QPixmap.fromImage(qimg)
-                self.label_fotodiri.setPixmap(pixmap.scaled(50, 50, QtCore.Qt.KeepAspectRatio))
-
-                self.label_credential_nik.setText(self.__userProfile['nik'])
-                self.label_credential_nik.adjustSize()
-
-        self.statusBar().showMessage(' Data terakhir diperbaharui: ' + str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) )
-
-        return True
-
-    def buildHeaderTable(self):
+    def __buildHeaderTable(self):
         headers = ['id_perizinan', 'NIS Santri', 'Nama Lengkap', 'Gender', 'Domisili', 'Lembaga', 'Alasan Izin', 'Bermalam', 'Rombongan', 'Tujuan', 'Status']
         self.tablePerizinan.setColumnCount(len(headers))
         self.tablePerizinan.setHorizontalHeaderLabels(headers)
@@ -206,7 +220,7 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
         font.setPointSize(10)
         self.tablePerizinan.horizontalHeader().setFont(font)
 
-    def buildRowTable(self, data):
+    def __buildRowTable(self, data):
         no = 0
         self.tablePerizinan.setRowCount(len(data))
         for row in data:
@@ -269,19 +283,12 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
             notification.showNotif('Status perizinan tidak valid. \nYang bisa input disini yg berstatus, perizinan sudah diacc atau yang kembali ke pondok')
             return
 
-        if response.status_code == 401:
-            self.close()
-            self.switch_window.emit()
-        elif response.status_code < 200 or response.status_code >= 300:
-            textJson = json.loads(response.text)
-            notification.showNotif(textJson['message'])
-        else:
+        if self.__responseApiHandler(response):
             self.refreshOnClicked()
 
         self.__childDialog.close()
 
     def doubleClickRow(self):
-
         self.tablePerizinan.showColumn(0)
         selectedIdPerizinan = self.tablePerizinan.selectedItems()[0].text()
         self.tablePerizinan.hideColumn(0)
@@ -289,13 +296,7 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
 
     def showIdPerizinan(self, id_perizinan):
         response = Pedatren.getItemPerizinan(id_perizinan)
-        if response.status_code == 401:
-            self.close()
-            self.switch_window.emit()
-        elif response.status_code < 200 or response.status_code >= 300:
-            textBody = json.loads(response.text)
-            notification.showNotif(textBody['message'])
-        else:
+        if self.__responseApiHandler(response):
             self.__childDialog = fdetailperizinan.Ui_DetailPerizinan()
             self.__childDialog.label_autoconfirminfo.clear()
             self.__childDialog.label_autoconfirminfo.setVisible(False)
@@ -312,8 +313,9 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
 
             fotodiri = pemohonIzin['fotodiri']
             fotoPemohonIzin = Pedatren.getImage(fotodiri['medium'])
-            pixmap = QtGui.QPixmap.fromImage(QtGui.QImage.fromData(fotoPemohonIzin.content))
-            self.__childDialog.label_fotodiri.setPixmap(pixmap.scaled(190, 190, QtCore.Qt.KeepAspectRatio))
+            if fotoPemohonIzin.status_code >= 200 and fotoPemohonIzin < 300:
+                pixmap = QtGui.QPixmap.fromImage(QtGui.QImage.fromData(fotoPemohonIzin.content))
+                self.__childDialog.label_fotodiri.setPixmap(pixmap.scaled(190, 190, QtCore.Qt.KeepAspectRatio))
 
             self.__childDialog.label_nama_lengkap.setText(pemohonIzin['nama_lengkap'])
             self.__childDialog.label_nama_lengkap.adjustSize()
@@ -411,29 +413,18 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
 
     def autoConfim(self, id_perizinan):
         response = Pedatren.getItemPerizinan(id_perizinan)
-        if response.status_code == 401:
-            self.close()
-            self.switch_window.emit()
-        elif response.status_code < 200 or response.status_code >= 300:
-            textBody = json.loads(response.text)
-            notification.showNotif(textBody['message'], True)
-            return False
-        else:
+        if self.__responseApiHandler(response, True):
             itemPerizinan = json.loads(response.text)
             if itemPerizinan['id_status_perizinan'] == 3:
                 resKeluar = Pedatren.setStatusKeluarDariPondok(id_perizinan)
-                if resKeluar.status_code < 200 or resKeluar.status_code >= 300:
-                    textJsonKeluar = json.loads(resKeluar.text)
-                    notification.showNotif(textJsonKeluar['message'], True)
-                    return False
+                self.__responseApiHandler(resKeluar, True)
+
             elif itemPerizinan['id_status_perizinan'] == 4 or itemPerizinan['id_status_perizinan'] == 5:
                 resKembali = Pedatren.setStatusKembaliKePondok(id_perizinan)
-                if resKembali.status_code < 200 or resKembali.status_code >= 300:
-                    textJsonKembali = json.loads(resKembali.text)
-                    notification.showNotif(textJsonKembali['message'], True)
-                    return False
+                self.__responseApiHandler(resKembali, True)
+
             else:
-                notification.showNotif('Status perizinan tidak valid. \nYang bisa input disini yg berstatus, perizinan sudah diacc atau yang kembali ke pondok', True)
+                notification.showNotif('Status perizinan tidak valid. \nYang bisa diproses adalah perizinan yg berstatus sudah disetujui (di-acc) atau yang kembali ke pondok', True)
                 return False
 
         self.refreshOnClicked()
@@ -466,8 +457,6 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
             Pedatren.logout()
             self.close()
             self.switch_window.emit()
-        else:
-            pass
 
     def keyPressEvent(self, e):
         if e.key() == QtCore.Qt.Key_F11:
@@ -477,4 +466,7 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
             else:
                 self.setWindowState(self.__lastWindowState)
 
-
+    def show(self):
+        super(Ui_TablePerizinan, self).show()
+        self.__getProfileUser()
+        self.buildTable()

@@ -40,7 +40,7 @@ class Ui_Login(QtWidgets.QDialog):
             return
 
         loginResult = Pedatren.login(username, password)
-        if loginResult.status_code < 200 or loginResult.status_code >= 300:
+        if loginResult != True:
             textBody = json.loads(loginResult.text)
             notification.showNotif(textBody['message'])
         else:
