@@ -178,7 +178,8 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
                 self.__userProfile = json.loads(responseUserProfile.text)
 
             if self.__userProfile:
-                self.label_credential_nama_lengkap.setText(Pedatren.credentials['nama_lengkap'] if Pedatren.credentials else '-')
+                levelScope = Pedatren.credentials['scope'][len(Pedatren.credentials['scope'])-1]
+                self.label_credential_nama_lengkap.setText( Pedatren.credentials['nama_lengkap'] + ' (' + levelScope +')' )
                 self.label_credential_nama_lengkap.adjustSize()
 
 
