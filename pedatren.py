@@ -2,28 +2,28 @@ import requests, json, base64
 from config import CONFIG
 
 
-def singleton(cls, *args, **kw):
-    instances = {}
-    def _singleton():
-        if cls not in instances:
-            instances[cls] = cls(*args, **kw)
-        return instances[cls]
-    return _singleton
-
-@singleton
 class Pedatren:
-    __instance = None
+    Request = None
+    __singleton = None
     __baseUrl = ''
     __headers = {
         'content-type' : 'application/json',
         'connection' : 'keep-alive',
         'User-Agent' : CONFIG.get('User-Agent')
     }
-    __token = ''
-    credentials = None
     __filetoken = 'token.tmp'
+    credentials = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls.__singleton:
+            cls.__singleton = super(Pedatren, cls).__new__(cls, *args, **kwargs)
+        return cls.__singleton
 
     def __init__(self):
+        self.Request = requests.Session()
+        self.Request.headers.update(self.__headers)
+        self.__baseUrl = CONFIG.get('BASE_API_URL')
+
         try:
             open(self.__filetoken, 'r')
         except IOError:
@@ -32,77 +32,107 @@ class Pedatren:
         with open(self.__filetoken, 'r') as f:
             token = f.read()
             if token:
-                self.__token = token
-                self.__headers['x-token'] = token
+                self.Request.headers.update({'x-token': token})
                 jwtPayload = token.split('.')[0]
                 jwtPayload += "=" * ((4 - len(jwtPayload) % 4) % 4)
                 self.credentials = json.loads(base64.b64decode(jwtPayload))
 
-        self.__baseUrl = CONFIG.get('BASE_API_URL')
+    def __responseHandler(self, response):
+        if response.status_code == 401:
+            self.Request.headers.pop('x-token', None)
+            self.credentials = None
 
-    def getToken(self):
-        return self.__token
+            with open(self.__filetoken, 'w') as f:
+                f.write('')
 
-    def getHeaders(self):
-        return self.__headers
+        return response
+
+    def __get(self, url, query={}):
+        try:
+            response = self.Request.get(url, params=query)
+            return self.__responseHandler(response)
+
+        except requests.exceptions.ConnectionError:
+            return {'exception': 'Terjadi kegagalan koneksi ke server API Pedatren. Bisa jadi dikarenakan : \n- Tidak ada jaringan, coba periksa koneksi jaringan wifi/lan anda.\n- Jaringan terlalu lambat sehingga terjadi timeout koneksi.\n- Server Pedatren sedang down.'}
+        except Exception as e:
+            return {'exception': str(e)}
+
+    def __post(self, url, dataPost={}):
+        try:
+            response = self.Request.post(url, data=json.dumps(dataPost))
+            return self.__responseHandler(response)
+
+        except requests.exceptions.ConnectionError:
+            return {'exception': 'Terjadi kegagalan koneksi ke server API Pedatren. Bisa jadi dikarenakan : \n- Tidak ada jaringan, coba periksa koneksi jaringan wifi/lan anda.\n- Jaringan terlalu lambat sehingga terjadi timeout koneksi.\n- Server Pedatren sedang down.'}
+        except Exception as e:
+            return {'exception': str(e)}
+
+    def __put(self, url, dataPost={}):
+        try:
+            response = self.Request.put(url, data=json.dumps(dataPost))
+            return self.__responseHandler(response)
+
+        except requests.exceptions.ConnectionError:
+            return {'exception': 'Terjadi kegagalan koneksi ke server API Pedatren. Bisa jadi dikarenakan : \n- Tidak ada jaringan, coba periksa koneksi jaringan wifi/lan anda.\n- Jaringan terlalu lambat sehingga terjadi timeout koneksi.\n- Server Pedatren sedang down.'}
+        except Exception as e:
+            return {'exception': str(e)}
+
+    def __delete(self, url):
+        try:
+            response = self.Request.delete(url)
+            return self.__responseHandler(response)
+
+        except requests.exceptions.ConnectionError:
+            return {'exception': 'Terjadi kegagalan koneksi ke server API Pedatren. Bisa jadi dikarenakan : \n- Tidak ada jaringan, coba periksa koneksi jaringan wifi/lan anda.\n- Jaringan terlalu lambat sehingga terjadi timeout koneksi.\n- Server Pedatren sedang down.'}
+        except Exception as e:
+            return {'exception': str(e)}
 
     def login(self, username=None, password=None):
-        # saat login jika dengan self.__headers yg sudah ada token, maka akan selalu ok dan adalah user di token, bukan dari user & pass yg dikirim
-        freshHeaders = {
-            'content-type' : 'application/json',
-            'connection' : 'keep-alive',
-            'User-Agent' : CONFIG.get('User-Agent')
-        }
+        try:
+            response = self.Request.get(self.__baseUrl + '/auth/login', auth=(username,password))
+            response.raise_for_status()
 
-        response = requests.get(self.__baseUrl + '/auth/login', headers=freshHeaders, auth=(username,password))
+            token = response.headers.get('x-token')
+            self.Request.headers.update({'x-token': token})
 
-        if response.status_code >= 200 and response.status_code < 300:
-            self.__token = response.headers['x-token']
-            self.__headers['x-token'] = response.headers['x-token']
-            jwtPayload = response.headers['x-token'].split('.')[0]
+            jwtPayload = token.split('.')[0]
             jwtPayload += "=" * ((4 - len(jwtPayload) % 4) % 4)
             self.credentials = json.loads(base64.b64decode(jwtPayload))
 
             with open(self.__filetoken, 'w') as f:
-                f.write(self.__token)
+                f.write(token)
 
-        else:
-            self.__token = ''
-            self.__headers.pop('x-token', None)
+            return True
+
+        except:
+            self.Request.headers.pop('x-token', None)
+            self.credentials = None
 
         return response
 
     def logout(self):
-        response = requests.get(self.__baseUrl + '/auth/logout', headers=self.__headers)
-
         with open(self.__filetoken, 'w') as f:
             f.write('')
 
-        return response
+        try:
+            self.Request.get(self.__baseUrl + '/auth/logout')
+        except:
+            pass
 
     def getListPerizinan(self, cari=None):
-        queryUrl = {}
-        if cari:
-            queryUrl = {'cari':cari}
-        response = requests.get(self.__baseUrl + '/penjagapos/perizinan/santri', headers=self.__headers, params=queryUrl)
-        return response
+        return self.__get(self.__baseUrl + '/penjagapos/perizinan/santri', cari)
 
     def getItemPerizinan(self, id_perizinan):
-        response = requests.get(self.__baseUrl + '/penjagapos/perizinan/santri/' + id_perizinan, headers=self.__headers)
-        return response
+        return self.__get(self.__baseUrl + '/penjagapos/perizinan/santri/' + id_perizinan)
 
     def setStatusKeluarDariPondok(self, id_perizinan):
-        response = requests.put(self.__baseUrl + '/penjagapos/perizinan/santri/' + id_perizinan + '/pemberitahuan', headers=self.__headers, data=json.dumps({'diketahui': 'Y'}))
-        return response
+        return self.__put(self.__baseUrl + '/penjagapos/perizinan/santri/' + id_perizinan + '/pemberitahuan', {'diketahui': 'Y'})
 
     def setStatusKembaliKePondok(self, id_perizinan):
-        response = requests.put(self.__baseUrl + '/penjagapos/perizinan/santri/' + id_perizinan + '/statuskembali', headers=self.__headers, data=json.dumps({'kembali': 'Y'}))
-        return response
+        return self.__put(self.__baseUrl + '/penjagapos/perizinan/santri/' + id_perizinan + '/statuskembali', {'kembali': 'Y'})
 
     def getImage(self, relative_path):
-        response = requests.get(self.__baseUrl + relative_path, headers=self.__headers)
-        return response
+        return self.__get(self.__baseUrl + relative_path)
 
     def getUserProfile(self):
-        response = requests.get(self.__baseUrl + '/person/' + str(self.credentials['uuid_person']), headers=self.__headers)
-        return response
+        return self.__get(self.__baseUrl + '/person/' + str(self.credentials['uuid_person']))
