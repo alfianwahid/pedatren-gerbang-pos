@@ -23,6 +23,11 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
         self.setWindowIcon( QtGui.QIcon( os.path.join(self.__basePath, 'img/logo.png') ) )
         self.setWindowState(QtCore.Qt.WindowMaximized)
         self.__lastWindowState = self.windowState()
+
+        self.menuHome.setStyle(QtWidgets.QStyleFactory.create('windowsvista'))
+        self.menuModeQR.setStyle(QtWidgets.QStyleFactory.create('windowsvista'))
+        self.menuHelp.setStyle(QtWidgets.QStyleFactory.create('windowsvista'))
+
         self.label_fotodiri.clear()
 
         self.buttonLogout.setIcon(QtGui.QIcon(os.path.join(self.__basePath, 'img/logout.ico')))
