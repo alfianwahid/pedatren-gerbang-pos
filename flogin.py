@@ -2,11 +2,10 @@
 import sys, os, json, pedatren, notification
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 
-Pedatren = pedatren.Pedatren()
-
 
 class Ui_Login(QtWidgets.QDialog):
     switch_window = QtCore.pyqtSignal()
+    PedatrenApi = pedatren.PedatrenApi()
 
     def __init__(self):
         super(Ui_Login, self).__init__()
@@ -39,12 +38,12 @@ class Ui_Login(QtWidgets.QDialog):
             notification.showNotif('Password tidak boleh kosong')
             return
 
-        loginResult = Pedatren.login(username, password)
+        loginResult = self.PedatrenApi.login(username, password)
         if loginResult != True:
             textBody = json.loads(loginResult.text)
             notification.showNotif(textBody['message'])
         else:
-            checkAksesPerizinan = Pedatren.getListPerizinan()
+            checkAksesPerizinan = self.PedatrenApi.getListPerizinan()
             if checkAksesPerizinan.status_code < 200 or checkAksesPerizinan.status_code >= 300:
                 textBody = json.loads(checkAksesPerizinan.text)
                 notification.showNotif(textBody['message'])

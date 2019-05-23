@@ -4,9 +4,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets, uic
 from datetime import datetime
 
 
-Pedatren = pedatren.Pedatren()
-
 class Ui_TablePerizinan(QtWidgets.QMainWindow):
+    PedatrenApi = pedatren.PedatrenApi()
     __lastWindowState = None
     __childDialog = None
     __itemIzin = None
@@ -85,16 +84,16 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
         self.menu_AutoConfirm.setChecked(True)
 
     def __getProfileUser(self):
-        if (not Pedatren.credentials) is False:
-            responseUserProfile = Pedatren.getUserProfile()
+        if (not self.PedatrenApi.credentials) is False:
+            responseUserProfile = self.PedatrenApi.getUserProfile()
             if responseUserProfile.status_code >= 200 and responseUserProfile.status_code < 300:
                 self.__userProfile = json.loads(responseUserProfile.text)
-                levelScope = Pedatren.credentials['scope'][len(Pedatren.credentials['scope'])-1]
-                self.label_credential_nama_lengkap.setText( Pedatren.credentials['nama_lengkap'] + ' (' + levelScope +')' )
+                levelScope = self.PedatrenApi.credentials['scope'][len(self.PedatrenApi.credentials['scope'])-1]
+                self.label_credential_nama_lengkap.setText( self.PedatrenApi.credentials['nama_lengkap'] + ' (' + levelScope +')' )
                 self.label_credential_nama_lengkap.adjustSize()
 
 
-                userProfileFoto = Pedatren.getImage(self.__userProfile['fotodiri']['small'])
+                userProfileFoto = self.PedatrenApi.getImage(self.__userProfile['fotodiri']['small'])
                 if userProfileFoto.status_code >= 200 and userProfileFoto.status_code < 300:
                     qimg = QtGui.QImage.fromData(userProfileFoto.content)
                     pixmap = QtGui.QPixmap.fromImage(qimg)
@@ -112,7 +111,7 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
         self.__userProfileDialog.tabWidget.setCurrentIndex(0)
 
         # Biodata
-        fotodiri = Pedatren.getImage(self.__userProfile['fotodiri']['medium'])
+        fotodiri = self.PedatrenApi.getImage(self.__userProfile['fotodiri']['medium'])
         if fotodiri.status_code >= 200 and fotodiri.status_code < 300:
             qimg = QtGui.QImage.fromData(fotodiri.content)
             pixmap = QtGui.QPixmap.fromImage(qimg)
@@ -191,7 +190,7 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
         self.__userProfileDialog.exec_()
 
     def buildTable(self, cari=None):
-        response = Pedatren.getListPerizinan(cari)
+        response = self.PedatrenApi.getListPerizinan(cari)
         if self.__responseApiHandler(response):
             listPerizinan = json.loads(response.text)
             self.__buildHeaderTable()
@@ -276,9 +275,9 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
 
     def konfirmasiPosOnclicked(self):
         if self.__itemIzin['id_status_perizinan'] == 3:
-            response = Pedatren.setStatusKeluarDariPondok(self.__itemIzin['id_perizinan'])
+            response = self.PedatrenApi.setStatusKeluarDariPondok(self.__itemIzin['id_perizinan'])
         elif self.__itemIzin['id_status_perizinan'] == 4 or self.__itemIzin['id_status_perizinan'] == 5:
-            response = Pedatren.setStatusKembaliKePondok(self.__itemIzin['id_perizinan'])
+            response = self.PedatrenApi.setStatusKembaliKePondok(self.__itemIzin['id_perizinan'])
         else:
             notification.showNotif('Status perizinan tidak valid. \nYang bisa input disini yg berstatus, perizinan sudah diacc atau yang kembali ke pondok')
             return
@@ -295,7 +294,7 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
         self.showIdPerizinan(selectedIdPerizinan)
 
     def showIdPerizinan(self, id_perizinan):
-        response = Pedatren.getItemPerizinan(id_perizinan)
+        response = self.PedatrenApi.getItemPerizinan(id_perizinan)
         if self.__responseApiHandler(response):
             self.__childDialog = fdetailperizinan.Ui_DetailPerizinan()
             self.__childDialog.label_autoconfirminfo.clear()
@@ -312,8 +311,8 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
             pemberitahuanKamtib = dataPerizinan['pemberitahuan_kamtib']
 
             fotodiri = pemohonIzin['fotodiri']
-            fotoPemohonIzin = Pedatren.getImage(fotodiri['medium'])
-            if fotoPemohonIzin.status_code >= 200 and fotoPemohonIzin < 300:
+            fotoPemohonIzin = self.PedatrenApi.getImage(fotodiri['medium'])
+            if fotoPemohonIzin.status_code >= 200 and fotoPemohonIzin.status_code < 300:
                 pixmap = QtGui.QPixmap.fromImage(QtGui.QImage.fromData(fotoPemohonIzin.content))
                 self.__childDialog.label_fotodiri.setPixmap(pixmap.scaled(190, 190, QtCore.Qt.KeepAspectRatio))
 
@@ -412,15 +411,15 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
         self.showIdPerizinan(id_perizinan)
 
     def autoConfim(self, id_perizinan):
-        response = Pedatren.getItemPerizinan(id_perizinan)
+        response = self.PedatrenApi.getItemPerizinan(id_perizinan)
         if self.__responseApiHandler(response, True):
             itemPerizinan = json.loads(response.text)
             if itemPerizinan['id_status_perizinan'] == 3:
-                resKeluar = Pedatren.setStatusKeluarDariPondok(id_perizinan)
+                resKeluar = self.PedatrenApi.setStatusKeluarDariPondok(id_perizinan)
                 self.__responseApiHandler(resKeluar, True)
 
             elif itemPerizinan['id_status_perizinan'] == 4 or itemPerizinan['id_status_perizinan'] == 5:
-                resKembali = Pedatren.setStatusKembaliKePondok(id_perizinan)
+                resKembali = self.PedatrenApi.setStatusKembaliKePondok(id_perizinan)
                 self.__responseApiHandler(resKembali, True)
 
             else:
@@ -454,7 +453,7 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
     def logoutOnClicked(self):
         close = QtWidgets.QMessageBox.question(self, 'Konfirmasi', 'Yakin akan logout? \nSelanjutnya akan diminta untuk login', QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
         if close == QtWidgets.QMessageBox.Yes:
-            Pedatren.logout()
+            self.PedatrenApi.logout()
             self.close()
             self.switch_window.emit()
 
