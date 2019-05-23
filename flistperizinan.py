@@ -38,9 +38,9 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
 
         self.buttonLogout.clicked.connect(self.logoutOnClicked)
         self.buttonRefresh.clicked.connect(self.refreshOnClicked)
-        self.tablePerizinan.doubleClicked.connect(self.doubleClickRow)
-        self.input_qr_code.returnPressed.connect(self.readInputQrCode)
-        self.input_cari.returnPressed.connect(self.cari)
+        self.tablePerizinan.doubleClicked.connect(self.doubleClickOnSelectedRow)
+        self.input_qr_code.returnPressed.connect(self.inputQrCodeOnPressed)
+        self.input_cari.returnPressed.connect(self.cariOnPressed)
         self.input_qr_code.addAction(QtGui.QIcon(os.path.join(self.__basePath, 'img/qr.ico')), QtWidgets.QLineEdit.LeadingPosition)
 
         self.menu_ManualConfirm.setChecked(True)
@@ -52,7 +52,6 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
         self.menu_ProfileUser.triggered.connect(self.showUserProfile)
         self.menu_Keluar.triggered.connect(self.logoutOnClicked)
         self.__iconReadingQrPath = os.path.join(self.__basePath, 'img/qr-reading-focus.jpg').replace('\\', '/')
-
 
 
     def __responseApiHandler(self, response, autoCloseNotif=False):
@@ -76,6 +75,7 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
             return False
 
         return True
+
 
     def menuAbout(self):
         QtWidgets.QMessageBox.about(self, 'About', 'Aplikasi Pedatren Gerbang Pos. \n\n\nVersi : 1.0.0 \nRelease : Mei 2019 \nDeveloped by : @alfianwahid')
@@ -194,8 +194,192 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
 
         self.__userProfileDialog.exec_()
 
+    def logoutOnClicked(self):
+        close = QtWidgets.QMessageBox.question(self, 'Konfirmasi', 'Yakin akan logout? \nSelanjutnya akan diminta untuk login', QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        if close == QtWidgets.QMessageBox.Yes:
+            self.PedatrenApi.logout()
+            self.close()
+            self.switch_window.emit()
+
+    def refreshOnClicked(self):
+        # Preventif dari badai klik tombol refresh yg seakan-akan spt ngeflood request api
+        self.buttonRefresh.setEnabled(False)
+        QtCore.QTimer.singleShot(10000, lambda: self.buttonRefresh.setDisabled(False))
+
+        self.tablePerizinan.clear()
+        self.tablePerizinan.setRowCount(0)
+        self.tablePerizinan.setColumnCount(0)
+        self.buildTable()
+        self.input_qr_code.setFocus()
+
+    def cariOnPressed(self):
+        strCari = self.input_cari.text().strip()
+        self.input_cari.clear()
+        self.buildTable(strCari)
+
+
+    def doubleClickOnSelectedRow(self):
+        self.tablePerizinan.showColumn(0)
+        selectedIdPerizinan = self.tablePerizinan.selectedItems()[0].text()
+        self.tablePerizinan.hideColumn(0)
+        self.showIdPerizinan(selectedIdPerizinan)
+
+    def showIdPerizinan(self, id_perizinan):
+        response = self.PedatrenApi.getItemPerizinan(id_perizinan)
+        if self.__responseApiHandler(response):
+            self.__childDialog = fdetailperizinan.Ui_DetailPerizinan()
+            self.__childDialog.label_autoconfirminfo.clear()
+            self.__childDialog.label_autoconfirminfo.setVisible(False)
+
+            dataPerizinan = json.loads(response.text)
+
+            pemohonIzin = dataPerizinan['pemohon_izin']
+
+            pengantar = dataPerizinan['pengantar']
+            pembuatIzin = dataPerizinan['pembuat_izin']
+            persetujuanPengasuh = dataPerizinan['persetujuan_pengasuh']
+            persetujuanBiktren = dataPerizinan['persetujuan_biktren']
+            pemberitahuanKamtib = dataPerizinan['pemberitahuan_kamtib']
+
+            fotodiri = pemohonIzin['fotodiri']
+            fotoPemohonIzin = self.PedatrenApi.getImage(fotodiri['medium'])
+            if fotoPemohonIzin.status_code >= 200 and fotoPemohonIzin.status_code < 300:
+                pixmap = QtGui.QPixmap.fromImage(QtGui.QImage.fromData(fotoPemohonIzin.content))
+                self.__childDialog.label_fotodiri.setPixmap(pixmap.scaled(190, 190, QtCore.Qt.KeepAspectRatio))
+
+            self.__childDialog.label_nama_lengkap.setText(pemohonIzin['nama_lengkap'])
+            self.__childDialog.label_nama_lengkap.adjustSize()
+            self.__childDialog.label_domisili.setText(pemohonIzin['domisili_santri'])
+            self.__childDialog.label_domisili.adjustSize()
+            lembaga = pemohonIzin['lembaga'] if pemohonIzin['lembaga'] else '-'
+            jurusan = ' - ' + pemohonIzin['jurusan'] if pemohonIzin['jurusan'] else ''
+            kelas = ' [' + pemohonIzin['kelas'] + ']' if pemohonIzin['kelas'] else ''
+            self.__childDialog.label_lembaga.setText(lembaga+jurusan+kelas)
+            self.__childDialog.label_lembaga.adjustSize()
+            self.__childDialog.label_alamat.setText(pemohonIzin['alamat'])
+            self.__childDialog.label_alamat.adjustSize()
+
+            self.__childDialog.label_alasan_izin.setText(dataPerizinan['alasan_izin'])
+            self.__childDialog.label_alasan_izin.adjustSize()
+            self.__childDialog.label_tujuan.setText(dataPerizinan['kecamatan_tujuan'])
+            self.__childDialog.label_tujuan.adjustSize()
+            self.__childDialog.label_lama_izin.setText(dataPerizinan['selama'] + '\nSejak      ' + dataPerizinan['sejak_tanggal'] + '\nSampai   ' + dataPerizinan['sampai_tanggal'])
+            self.__childDialog.label_lama_izin.adjustSize()
+            self.__childDialog.label_bermalam.setText(dataPerizinan['bermalam'])
+            self.__childDialog.label_rombongan.setText(dataPerizinan['rombongan'])
+
+            id_status_perizinan = int(dataPerizinan['id_status_perizinan'])
+            if id_status_perizinan == 5:
+                self.__childDialog.label_status_perizinan.setStyleSheet('QLabel { color: rgb(255, 0, 0); font-weight: bold}')
+                self.__childDialog.buttonKonfirmasiPos.setStyleSheet('QPushButton{background-color: qlineargradient(x1: 0,y1: 0,x2: 0,y2: 1,stop: 0 #5cc151, stop: 1 #28a745); border: 1px solid #39892f; border-radius: 10px; color: white; font-weight: bold;} QPushButton:hover{background-color: qlineargradient(x1: 0,y1: 0,x2: 0,y2: 1,stop: 0 rgba(92, 193, 81, 0.9), stop: 1 rgba(40, 167, 69, 0.9))} QPushButton:pressed {background-color: rgb(40, 167, 69)}')
+                self.__childDialog.buttonKonfirmasiPos.setText('Konfirmasi\n \nKembali \nke Pondok')
+            elif id_status_perizinan == 4:
+                self.__childDialog.label_status_perizinan.setStyleSheet('QLabel { color: rgb(140, 140, 140); font-weight: bold}')
+                self.__childDialog.buttonKonfirmasiPos.setStyleSheet('QPushButton{background-color: qlineargradient(x1: 0,y1: 0,x2: 0,y2: 1,stop: 0 #5cc151, stop: 1 #28a745); border: 1px solid #39892f; border-radius: 10px; color: white; font-weight: bold;} QPushButton:hover{background-color: qlineargradient(x1: 0,y1: 0,x2: 0,y2: 1,stop: 0 rgba(92, 193, 81, 0.9), stop: 1 rgba(40, 167, 69, 0.9))} QPushButton:pressed {background-color: rgb(40, 167, 69)}')
+                self.__childDialog.buttonKonfirmasiPos.setText('Konfirmasi\n \nKembali \nke Pondok')
+            elif id_status_perizinan == 3:
+                self.__childDialog.label_status_perizinan.setStyleSheet('QLabel { color: rgb(0, 170, 0); font-weight: bold}')
+                self.__childDialog.buttonKonfirmasiPos.setStyleSheet('QPushButton{background-color: qlineargradient(x1: 0,y1: 0,x2: 0,y2: 1,stop: 0 #008eff, stop: 1 #0078d7); border: 1px solid #007bff; border-radius: 10px; color: white; font-weight: bold;} QPushButton:hover{background-color: qlineargradient(x1: 0,y1: 0,x2: 0,y2: 1,stop: 0 rgba(0, 142, 255, 0.9), stop: 1 rgba(0, 120, 215, 0.9))} QPushButton:pressed {background-color: rgb(0, 120, 215)}')
+                self.__childDialog.buttonKonfirmasiPos.setText('Konfirmasi\n \nIzin Keluar \nPondok')
+
+            self.__childDialog.label_status_perizinan.setText(dataPerizinan['status_perizinan'])
+
+            self.__itemIzin = {'id_status_perizinan': id_status_perizinan, 'id_perizinan': id_perizinan}
+            self.__childDialog.buttonKonfirmasiPos.clicked.connect(self.__konfirmasiPenjagaPosOnclicked)
+
+            if dataPerizinan['tanggal_kembali'] and id_status_perizinan >= 4:
+                self.__childDialog.label_tanggal_kembali_info.setText(dataPerizinan['tanggal_kembali'])
+            else:
+                self.__childDialog.label_tanggal_kembali_info.setText('Belum kembali')
+                self.__childDialog.label_tanggal_kembali_info.setStyleSheet('QLabel { color : rgb(140, 140, 140);}')
+
+            self.__childDialog.label_pengantar.setText(pengantar['nama_lengkap'] if pengantar['nama_lengkap'] else '-')
+            self.__childDialog.label_pengantar.adjustSize()
+            self.__childDialog.label_pembuat_izin.setText(pembuatIzin['nama_lengkap'] if pembuatIzin['nama_lengkap'] else '-')
+            self.__childDialog.label_pembuat_izin.adjustSize()
+            self.__childDialog.label_biktren.setText(persetujuanBiktren['nama_lengkap'] if persetujuanBiktren['nama_lengkap'] else '-')
+            self.__childDialog.label_biktren.adjustSize()
+            self.__childDialog.label_pengasuh.setText(persetujuanPengasuh['nama_lengkap'] if persetujuanPengasuh['nama_lengkap'] else '-')
+            self.__childDialog.label_pengasuh.adjustSize()
+            self.__childDialog.label_kamtib.setText(pemberitahuanKamtib['nama_lengkap'] if pemberitahuanKamtib['nama_lengkap'] else '-')
+            self.__childDialog.label_kamtib.adjustSize()
+
+            if self.menu_AutoConfirm.isChecked() == True:
+                self.__childDialog.buttonKonfirmasiPos.setVisible(False)
+
+                timerClose = QtCore.QTimer(self.__childDialog)
+                timerClose.setSingleShot(True)
+                timerClose.timeout.connect(self.__childDialog.close)
+                timerClose.start(5000)
+
+                if self.__isAutoConfirmOK == True:
+                    self.__childDialog.label_autoconfirminfo.setVisible(True)
+                    pixmapCheckbox = QtGui.QPixmap.fromImage(QtGui.QImage( os.path.join(self.__basePath, 'img/checkbox.png') ))
+                    self.__childDialog.label_autoconfirminfo.setPixmap(pixmapCheckbox.scaled(100, 100, QtCore.Qt.KeepAspectRatio))
+                    self.__isAutoConfirmOK = False
+
+            self.__childDialog.exec_()
+
+    def __konfirmasiPenjagaPosOnclicked(self):
+        if self.__itemIzin['id_status_perizinan'] == 3:
+            response = self.PedatrenApi.setStatusKeluarDariPondok(self.__itemIzin['id_perizinan'])
+        elif self.__itemIzin['id_status_perizinan'] == 4 or self.__itemIzin['id_status_perizinan'] == 5:
+            response = self.PedatrenApi.setStatusKembaliKePondok(self.__itemIzin['id_perizinan'])
+        else:
+            notification.showNotif('Status perizinan tidak valid. \nYang bisa input disini yg berstatus, perizinan sudah diacc atau yang kembali ke pondok')
+            return
+
+        if self.__responseApiHandler(response):
+            self.refreshOnClicked()
+
+        self.__childDialog.close()
+
+
+
+    def inputQrCodeOnPressed(self):
+        textqrcode = self.input_qr_code.text().strip()
+        self.input_qr_code.clear()
+        if not textqrcode or textqrcode == '':
+            notification.showNotif('Input QR Code tidak boleh kosong', True)
+            return
+        try:
+            decoded64 = base64.b64decode(textqrcode)
+            resJson = json.loads(decoded64)
+            id_perizinan = resJson['id_perizinan_santri']
+        except:
+            notification.showNotif('Input QR Code bukan jenis QR Code Perizinan atau bukan dari Pedatren', True)
+            return
+
+        if self.menu_AutoConfirm.isChecked() == True:
+            self.__isAutoConfirmOK = self.__autoConfim(id_perizinan)
+            if self.__isAutoConfirmOK == False:
+                return
+
+        self.showIdPerizinan(id_perizinan)
+
+    def __autoConfim(self, id_perizinan):
+        response = self.PedatrenApi.getItemPerizinan(id_perizinan)
+        if self.__responseApiHandler(response, True):
+            itemPerizinan = json.loads(response.text)
+            if itemPerizinan['id_status_perizinan'] == 3:
+                resKeluar = self.PedatrenApi.setStatusKeluarDariPondok(id_perizinan)
+                self.__responseApiHandler(resKeluar, True)
+
+            elif itemPerizinan['id_status_perizinan'] == 4 or itemPerizinan['id_status_perizinan'] == 5:
+                resKembali = self.PedatrenApi.setStatusKembaliKePondok(id_perizinan)
+                self.__responseApiHandler(resKembali, True)
+
+            else:
+                notification.showNotif('Status perizinan tidak valid. \nYang bisa diproses adalah perizinan yg berstatus sudah disetujui (di-acc) atau yang kembali ke pondok', True)
+                return False
+
+        self.refreshOnClicked()
+        return True
+
+
+
     def buildTable(self, cari=None):
-        response = self.PedatrenApi.getListPerizinan(cari)
+        response = self.PedatrenApi.getListPerizinan({'cari':cari})
         if self.__responseApiHandler(response):
             listPerizinan = json.loads(response.text)
             self.__buildHeaderTable()
@@ -267,177 +451,7 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
 
         self.tablePerizinan.hideColumn(0)
 
-    def refreshOnClicked(self):
-        # Preventif dari badai klik tombol refresh yg seakan-akan spt ngeflood request api
-        self.buttonRefresh.setEnabled(False)
-        QtCore.QTimer.singleShot(10000, lambda: self.buttonRefresh.setDisabled(False))
 
-        self.tablePerizinan.clear()
-        self.tablePerizinan.setRowCount(0)
-        self.tablePerizinan.setColumnCount(0)
-        self.buildTable()
-        self.input_qr_code.setFocus()
-
-    def konfirmasiPosOnclicked(self):
-        if self.__itemIzin['id_status_perizinan'] == 3:
-            response = self.PedatrenApi.setStatusKeluarDariPondok(self.__itemIzin['id_perizinan'])
-        elif self.__itemIzin['id_status_perizinan'] == 4 or self.__itemIzin['id_status_perizinan'] == 5:
-            response = self.PedatrenApi.setStatusKembaliKePondok(self.__itemIzin['id_perizinan'])
-        else:
-            notification.showNotif('Status perizinan tidak valid. \nYang bisa input disini yg berstatus, perizinan sudah diacc atau yang kembali ke pondok')
-            return
-
-        if self.__responseApiHandler(response):
-            self.refreshOnClicked()
-
-        self.__childDialog.close()
-
-    def doubleClickRow(self):
-        self.tablePerizinan.showColumn(0)
-        selectedIdPerizinan = self.tablePerizinan.selectedItems()[0].text()
-        self.tablePerizinan.hideColumn(0)
-        self.showIdPerizinan(selectedIdPerizinan)
-
-    def showIdPerizinan(self, id_perizinan):
-        response = self.PedatrenApi.getItemPerizinan(id_perizinan)
-        if self.__responseApiHandler(response):
-            self.__childDialog = fdetailperizinan.Ui_DetailPerizinan()
-            self.__childDialog.label_autoconfirminfo.clear()
-            self.__childDialog.label_autoconfirminfo.setVisible(False)
-
-            dataPerizinan = json.loads(response.text)
-
-            pemohonIzin = dataPerizinan['pemohon_izin']
-
-            pengantar = dataPerizinan['pengantar']
-            pembuatIzin = dataPerizinan['pembuat_izin']
-            persetujuanPengasuh = dataPerizinan['persetujuan_pengasuh']
-            persetujuanBiktren = dataPerizinan['persetujuan_biktren']
-            pemberitahuanKamtib = dataPerizinan['pemberitahuan_kamtib']
-
-            fotodiri = pemohonIzin['fotodiri']
-            fotoPemohonIzin = self.PedatrenApi.getImage(fotodiri['medium'])
-            if fotoPemohonIzin.status_code >= 200 and fotoPemohonIzin.status_code < 300:
-                pixmap = QtGui.QPixmap.fromImage(QtGui.QImage.fromData(fotoPemohonIzin.content))
-                self.__childDialog.label_fotodiri.setPixmap(pixmap.scaled(190, 190, QtCore.Qt.KeepAspectRatio))
-
-            self.__childDialog.label_nama_lengkap.setText(pemohonIzin['nama_lengkap'])
-            self.__childDialog.label_nama_lengkap.adjustSize()
-            self.__childDialog.label_domisili.setText(pemohonIzin['domisili_santri'])
-            self.__childDialog.label_domisili.adjustSize()
-            lembaga = pemohonIzin['lembaga'] if pemohonIzin['lembaga'] else '-'
-            jurusan = ' - ' + pemohonIzin['jurusan'] if pemohonIzin['jurusan'] else ''
-            kelas = ' [' + pemohonIzin['kelas'] + ']' if pemohonIzin['kelas'] else ''
-            self.__childDialog.label_lembaga.setText(lembaga+jurusan+kelas)
-            self.__childDialog.label_lembaga.adjustSize()
-            self.__childDialog.label_alamat.setText(pemohonIzin['alamat'])
-            self.__childDialog.label_alamat.adjustSize()
-
-            self.__childDialog.label_alasan_izin.setText(dataPerizinan['alasan_izin'])
-            self.__childDialog.label_alasan_izin.adjustSize()
-            self.__childDialog.label_tujuan.setText(dataPerizinan['kecamatan_tujuan'])
-            self.__childDialog.label_tujuan.adjustSize()
-            self.__childDialog.label_lama_izin.setText(dataPerizinan['selama'] + '\nSejak      ' + dataPerizinan['sejak_tanggal'] + '\nSampai   ' + dataPerizinan['sampai_tanggal'])
-            self.__childDialog.label_lama_izin.adjustSize()
-            self.__childDialog.label_bermalam.setText(dataPerizinan['bermalam'])
-            self.__childDialog.label_rombongan.setText(dataPerizinan['rombongan'])
-
-            id_status_perizinan = int(dataPerizinan['id_status_perizinan'])
-            if id_status_perizinan == 5:
-                self.__childDialog.label_status_perizinan.setStyleSheet('QLabel { color: rgb(255, 0, 0); font-weight: bold}')
-                self.__childDialog.buttonKonfirmasiPos.setStyleSheet('QPushButton{background-color: qlineargradient(x1: 0,y1: 0,x2: 0,y2: 1,stop: 0 #5cc151, stop: 1 #28a745); border: 1px solid #39892f; border-radius: 10px; color: white; font-weight: bold;} QPushButton:hover{background-color: qlineargradient(x1: 0,y1: 0,x2: 0,y2: 1,stop: 0 rgba(92, 193, 81, 0.9), stop: 1 rgba(40, 167, 69, 0.9))} QPushButton:pressed {background-color: rgb(40, 167, 69)}')
-                self.__childDialog.buttonKonfirmasiPos.setText('Konfirmasi\n \nKembali \nke Pondok')
-            elif id_status_perizinan == 4:
-                self.__childDialog.label_status_perizinan.setStyleSheet('QLabel { color: rgb(140, 140, 140); font-weight: bold}')
-                self.__childDialog.buttonKonfirmasiPos.setStyleSheet('QPushButton{background-color: qlineargradient(x1: 0,y1: 0,x2: 0,y2: 1,stop: 0 #5cc151, stop: 1 #28a745); border: 1px solid #39892f; border-radius: 10px; color: white; font-weight: bold;} QPushButton:hover{background-color: qlineargradient(x1: 0,y1: 0,x2: 0,y2: 1,stop: 0 rgba(92, 193, 81, 0.9), stop: 1 rgba(40, 167, 69, 0.9))} QPushButton:pressed {background-color: rgb(40, 167, 69)}')
-                self.__childDialog.buttonKonfirmasiPos.setText('Konfirmasi\n \nKembali \nke Pondok')
-            elif id_status_perizinan == 3:
-                self.__childDialog.label_status_perizinan.setStyleSheet('QLabel { color: rgb(0, 170, 0); font-weight: bold}')
-                self.__childDialog.buttonKonfirmasiPos.setStyleSheet('QPushButton{background-color: qlineargradient(x1: 0,y1: 0,x2: 0,y2: 1,stop: 0 #008eff, stop: 1 #0078d7); border: 1px solid #007bff; border-radius: 10px; color: white; font-weight: bold;} QPushButton:hover{background-color: qlineargradient(x1: 0,y1: 0,x2: 0,y2: 1,stop: 0 rgba(0, 142, 255, 0.9), stop: 1 rgba(0, 120, 215, 0.9))} QPushButton:pressed {background-color: rgb(0, 120, 215)}')
-                self.__childDialog.buttonKonfirmasiPos.setText('Konfirmasi\n \nIzin Keluar \nPondok')
-
-            self.__childDialog.label_status_perizinan.setText(dataPerizinan['status_perizinan'])
-
-            self.__itemIzin = {'id_status_perizinan': id_status_perizinan, 'id_perizinan': id_perizinan}
-            self.__childDialog.buttonKonfirmasiPos.clicked.connect(self.konfirmasiPosOnclicked)
-
-            if dataPerizinan['tanggal_kembali'] and id_status_perizinan >= 4:
-                self.__childDialog.label_tanggal_kembali_info.setText(dataPerizinan['tanggal_kembali'])
-            else:
-                self.__childDialog.label_tanggal_kembali_info.setText('Belum kembali')
-                self.__childDialog.label_tanggal_kembali_info.setStyleSheet('QLabel { color : rgb(140, 140, 140);}')
-
-            self.__childDialog.label_pengantar.setText(pengantar['nama_lengkap'] if pengantar['nama_lengkap'] else '-')
-            self.__childDialog.label_pengantar.adjustSize()
-            self.__childDialog.label_pembuat_izin.setText(pembuatIzin['nama_lengkap'] if pembuatIzin['nama_lengkap'] else '-')
-            self.__childDialog.label_pembuat_izin.adjustSize()
-            self.__childDialog.label_biktren.setText(persetujuanBiktren['nama_lengkap'] if persetujuanBiktren['nama_lengkap'] else '-')
-            self.__childDialog.label_biktren.adjustSize()
-            self.__childDialog.label_pengasuh.setText(persetujuanPengasuh['nama_lengkap'] if persetujuanPengasuh['nama_lengkap'] else '-')
-            self.__childDialog.label_pengasuh.adjustSize()
-            self.__childDialog.label_kamtib.setText(pemberitahuanKamtib['nama_lengkap'] if pemberitahuanKamtib['nama_lengkap'] else '-')
-            self.__childDialog.label_kamtib.adjustSize()
-
-            if self.menu_AutoConfirm.isChecked() == True:
-                self.__childDialog.buttonKonfirmasiPos.setVisible(False)
-
-                timerClose = QtCore.QTimer(self.__childDialog)
-                timerClose.setSingleShot(True)
-                timerClose.timeout.connect(self.__childDialog.close)
-                timerClose.start(5000)
-
-                if self.__isAutoConfirmOK == True:
-                    self.__childDialog.label_autoconfirminfo.setVisible(True)
-                    pixmapCheckbox = QtGui.QPixmap.fromImage(QtGui.QImage( os.path.join(self.__basePath, 'img/checkbox.png') ))
-                    self.__childDialog.label_autoconfirminfo.setPixmap(pixmapCheckbox.scaled(100, 100, QtCore.Qt.KeepAspectRatio))
-                    self.__isAutoConfirmOK = False
-
-            self.__childDialog.exec_()
-
-    def readInputQrCode(self):
-        textqrcode = self.input_qr_code.text().strip()
-        self.input_qr_code.clear()
-        if not textqrcode or textqrcode == '':
-            notification.showNotif('Input QR Code tidak boleh kosong', True)
-            return
-        try:
-            decoded64 = base64.b64decode(textqrcode)
-            resJson = json.loads(decoded64)
-            id_perizinan = resJson['id_perizinan_santri']
-        except:
-            notification.showNotif('Input QR Code bukan jenis QR Code Perizinan atau bukan dari Pedatren', True)
-            return
-
-        if self.menu_AutoConfirm.isChecked() == True:
-            self.__isAutoConfirmOK = self.autoConfim(id_perizinan)
-            if self.__isAutoConfirmOK == False:
-                return
-
-        self.showIdPerizinan(id_perizinan)
-
-    def autoConfim(self, id_perizinan):
-        response = self.PedatrenApi.getItemPerizinan(id_perizinan)
-        if self.__responseApiHandler(response, True):
-            itemPerizinan = json.loads(response.text)
-            if itemPerizinan['id_status_perizinan'] == 3:
-                resKeluar = self.PedatrenApi.setStatusKeluarDariPondok(id_perizinan)
-                self.__responseApiHandler(resKeluar, True)
-
-            elif itemPerizinan['id_status_perizinan'] == 4 or itemPerizinan['id_status_perizinan'] == 5:
-                resKembali = self.PedatrenApi.setStatusKembaliKePondok(id_perizinan)
-                self.__responseApiHandler(resKembali, True)
-
-            else:
-                notification.showNotif('Status perizinan tidak valid. \nYang bisa diproses adalah perizinan yg berstatus sudah disetujui (di-acc) atau yang kembali ke pondok', True)
-                return False
-
-        self.refreshOnClicked()
-        return True
-
-    def cari(self):
-        strCari = self.input_cari.text().strip()
-        self.input_cari.clear()
-        self.buildTable(strCari)
 
     def eventFilter(self, source, event):
         if source is self.tablePerizinan:
@@ -454,13 +468,6 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
                 self.input_qr_code.setFocus()
 
         return super(Ui_TablePerizinan, self).eventFilter(source, event)
-
-    def logoutOnClicked(self):
-        close = QtWidgets.QMessageBox.question(self, 'Konfirmasi', 'Yakin akan logout? \nSelanjutnya akan diminta untuk login', QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-        if close == QtWidgets.QMessageBox.Yes:
-            self.PedatrenApi.logout()
-            self.close()
-            self.switch_window.emit()
 
     def keyPressEvent(self, e):
         if e.key() == QtCore.Qt.Key_F11:
