@@ -112,7 +112,7 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
             notification.showNotif('Kegagalan system mendapatkan info user Anda. Silahkan coba login ulang lagi.')
             return
 
-        self.__userProfileDialog = fprofileuser.Ui_ProfileUser()
+        self.__userProfileDialog = fprofileuser.Ui_ProfileUser(self)
         self.__userProfileDialog.tabWidget.setCurrentIndex(0)
 
         # Biodata
@@ -227,7 +227,7 @@ class Ui_TablePerizinan(QtWidgets.QMainWindow):
     def showIdPerizinan(self, id_perizinan):
         response = self.PedatrenApi.getItemPerizinan(id_perizinan)
         if self.__responseApiHandler(response):
-            self.__childDialog = fdetailperizinan.Ui_DetailPerizinan()
+            self.__childDialog = fdetailperizinan.Ui_DetailPerizinan(self)
             self.__childDialog.label_autoconfirminfo.clear()
             self.__childDialog.label_autoconfirminfo.setVisible(False)
 
